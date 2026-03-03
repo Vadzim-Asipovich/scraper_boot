@@ -1,153 +1,200 @@
-import { describe, expect, test } from 'vitest'
-import { 
-  getFirstParagraphFromHTML, 
-  getHeadingFromHTML, 
-  normalizeURL, 
-  getURLsFromHTML,
+import { test, expect } from "vitest";
+import {
+  normalizeURL,
+  getHeadingFromHTML,
+  getFirstParagraphFromHTML,
   getImagesFromHTML,
-  extractPageData } from './crawl'
+  getURLsFromHTML,
+  extractPageData,
+} from "./crawl";
 
-const expectedOutput = 'www.boot.dev/blog/path'
+test("normalizeURL protocol", () => {
+  const input = "https://crawler-test.com/path";
+  const actual = normalizeURL(input);
+  const expected = "crawler-test.com/path";
+  expect(actual).toEqual(expected);
+});
 
-const htmlWithH1 = `<html><body>
-  <h1>Outside paragraph.</h1>
-  <main>
-    <h2>Main paragraph.</h2>
-  </main>
-</body></html>`
+test("normalizeURL slash", () => {
+  const input = "https://crawler-test.com/path/";
+  const actual = normalizeURL(input);
+  const expected = "crawler-test.com/path";
+  expect(actual).toEqual(expected);
+});
 
-const htmlWithH2Only = `<html><body>
-  <h2>Main paragraph.</h2>
-  <main>
-    <h3>Sub paragraph.</h3>
-  </main>
-</body></html>`
+test("normalizeURL capitals", () => {
+  const input = "https://CRAWLER-TEST.com/path";
+  const actual = normalizeURL(input);
+  const expected = "crawler-test.com/path";
+  expect(actual).toEqual(expected);
+});
 
-const htmlWithMainParagraph = `<html><body>
-  <p>Main paragraph.</p>
-  <main>
-    <p>Sub paragraph.</p>
-  </main>
-</body></html>`
+test("normalizeURL http", () => {
+  const input = "http://CRAWLER-TEST.com/path";
+  const actual = normalizeURL(input);
+  const expected = "crawler-test.com/path";
+  expect(actual).toEqual(expected);
+});
 
-const htmlWithNoMain = `<html><body>
-  <p>Main paragraph.</p>
-  <p>Sub paragraph.</p>
-</body></html>`
+test("getHeadingFromHTML basic", () => {
+  const inputBody = `<html><body><h1>Test Title</h1></body></html>`;
+  const actual = getHeadingFromHTML(inputBody);
+  const expected = "Test Title";
+  expect(actual).toEqual(expected);
+});
 
-const htmlWithNoParagraph = `<html><body>
-  <h1>Main paragraph.</h1>
-  <h1>Sub paragraph.</h1>
-</body></html>`
+test("getHeadingFromHTML h2 fallback", () => {
+  const inputBody = `<html><body><h2>Fallback Title</h2></body></html>`;
+  const actual = getHeadingFromHTML(inputBody);
+  const expected = "Fallback Title";
+  expect(actual).toEqual(expected);
+});
 
-const htmlWithRelativeURL = `<html><body><a href="/path/one"><span>Boot.dev</span></a></body></html>`
+test("getFirstParagraphFromHTML main priority", () => {
+  const inputBody = `
+    <html><body>
+      <p>Outside paragraph.</p>
+      <main>
+        <p>Main paragraph.</p>
+      </main>
+    </body></html>`;
+  const actual = getFirstParagraphFromHTML(inputBody);
+  const expected = "Main paragraph.";
+  expect(actual).toEqual(expected);
+});
 
-const htmlWithRelativeImage = `<html><body><img src="/path/image.png"></body></html>`
+test("getFirstParagraphFromHTML fallback to first p", () => {
+  const inputBody = `
+    <html><body>
+      <p>First outside paragraph.</p>
+      <p>Second outside paragraph.</p>
+    </body></html>`;
+  const actual = getFirstParagraphFromHTML(inputBody);
+  const expected = "First outside paragraph.";
+  expect(actual).toEqual(expected);
+});
 
-describe('normalizeURL', () => {
-  test('https and trailing slash are removed', () => {
-    expect(normalizeURL('https://www.boot.dev/blog/path/')).toBe(expectedOutput)
-  })
+test("getFirstParagraphFromHTML no paragraphs", () => {
+  const inputBody = `<html><body><h1>Title</h1></body></html>`;
+  const actual = getFirstParagraphFromHTML(inputBody);
+  const expected = "";
+  expect(actual).toEqual(expected);
+});
 
-  test('normalized string as input does not change', () => {
-    expect(normalizeURL(expectedOutput)).toBe(expectedOutput)
-  })
-})
+test("getURLsFromHTML absolute", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody = `<html><body><a href="https://crawler-test.com"><span>Boot.dev</span></a></body></html>`;
+  const actual = getURLsFromHTML(inputBody, inputURL);
+  const expected = ["https://crawler-test.com/"];
+  expect(actual).toEqual(expected);
+});
 
-describe('getHeadingFromHTML', () => {
-  test('returns h1 from HTML', () => {
-    expect(getHeadingFromHTML(htmlWithH1)).toBe('Outside paragraph.')
-  })
+test("getURLsFromHTML relative", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody = `<html><body><a href="/path/one"><span>Boot.dev</span></a></body></html>`;
+  const actual = getURLsFromHTML(inputBody, inputURL);
+  const expected = ["https://crawler-test.com/path/one"];
+  expect(actual).toEqual(expected);
+});
 
-  test('returns h2 from HTML if h1 is not present', () => {
-    expect(getHeadingFromHTML(htmlWithH2Only)).toBe('Main paragraph.')
-  })
+test("getURLsFromHTML both absolute and relative", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody =
+    `<html><body>` +
+    `<a href="/path/one"><span>Boot.dev</span></a>` +
+    `<a href="https://other.com/path/one"><span>Boot.dev</span></a>` +
+    `</body></html>`;
+  const actual = getURLsFromHTML(inputBody, inputURL);
+  const expected = [
+    "https://crawler-test.com/path/one",
+    "https://other.com/path/one",
+  ];
+  expect(actual).toEqual(expected);
+});
 
-  test('returns empty string if no headings are present', () => {
-    expect(getHeadingFromHTML(htmlWithMainParagraph)).toBe('')
-  })
-})
+test("getImagesFromHTML absolute", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody = `<html><body><img src="https://crawler-test.com/logo.png" alt="Logo"></body></html>`;
+  const actual = getImagesFromHTML(inputBody, inputURL);
+  const expected = ["https://crawler-test.com/logo.png"];
+  expect(actual).toEqual(expected);
+});
 
-describe('getFirstParagraphFromHTML', () => {
-  test('returns first paragraph in <main> from HTML when present', () => {
-    expect(getFirstParagraphFromHTML(htmlWithMainParagraph)).toBe('Sub paragraph.')
-  })
+test("getImagesFromHTML relative", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody = `<html><body><img src="/logo.png" alt="Logo"></body></html>`;
+  const actual = getImagesFromHTML(inputBody, inputURL);
+  const expected = ["https://crawler-test.com/logo.png"];
+  expect(actual).toEqual(expected);
+});
 
-  test('returns first paragraph from HTML if no <main>', () => {
-    expect(getFirstParagraphFromHTML(htmlWithNoMain)).toBe('Main paragraph.')
-  })
+test("getImagesFromHTML multiple", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody =
+    `<html><body>` +
+    `<img src="/logo.png" alt="Logo">` +
+    `<img src="https://cdn.boot.dev/banner.jpg">` +
+    `</body></html>`;
+  const actual = getImagesFromHTML(inputBody, inputURL);
+  const expected = [
+    "https://crawler-test.com/logo.png",
+    "https://cdn.boot.dev/banner.jpg",
+  ];
+  expect(actual).toEqual(expected);
+});
 
-  test('returns empty string if no paragraph is present', () => {
-    expect(getFirstParagraphFromHTML(htmlWithNoParagraph)).toBe('')
-  })
-})
-
-describe('getURLsFromHTML', () => {
-  test('relative URLs are converted to absolute URLs', () => {
-    expect(getURLsFromHTML(htmlWithRelativeURL, 'https://www.boot.dev')).toEqual(['https://www.boot.dev/path/one'])
-  })
-  test('absolute URLs are not modified', () => {
-    const htmlWithAbsoluteURL = `<html><body><a href="https://www.example.com/path/one"><span>Example</span></a></body></html>`
-    expect(getURLsFromHTML(htmlWithAbsoluteURL, 'https://www.boot.dev')).toEqual(['https://www.example.com/path/one'])
-  })
-  test('multiple URLs are all converted correctly', () => {    const htmlWithMultipleURLs = `<html><body>
-      <a href="/path/one"><span>Boot.dev</span></a>
-      <a href="https://www.example.com/path/two"><span>Example</span></a>
-    </body></html>`
-    expect(getURLsFromHTML(htmlWithMultipleURLs, 'https://www.boot.dev')).toEqual(['https://www.boot.dev/path/one', 'https://www.example.com/path/two'])
-  })
-
-})
-
-describe('getImagesFromHTML', () => {
-  test('relative image URLs are converted to absolute URLs', () => {
-    expect(getImagesFromHTML(htmlWithRelativeImage, 'https://www.boot.dev')).toEqual(['https://www.boot.dev/path/image.png'])
-  })
-  test('absolute image URLs are not modified', () => {
-    const htmlWithAbsoluteImage = `<html><body><img src="https://www.example.com/path/image.png"></body></html>`
-    expect(getImagesFromHTML(htmlWithAbsoluteImage, 'https://www.boot.dev')).toEqual(['https://www.example.com/path/image.png'])
-  })
-  test('multiple image URLs are all converted correctly', () => {    const htmlWithMultipleImages = `<html><body>
-      <img src="/path/image1.png">
-      <img src="https://www.example.com/path/image2.png">
-    </body></html>`
-    expect(getImagesFromHTML(htmlWithMultipleImages, 'https://www.boot.dev')).toEqual(['https://www.boot.dev/path/image1.png', 'https://www.example.com/path/image2.png'])
-  })  
-})
-
-describe('extractPageData', () => {
-  test('relative image URLs are converted to absolute URLs', () => {
-    const expected = {
-    url: "https://crawler-test.com",
-    heading: "Test Title",
-    firstParagraph: "This is the first paragraph.",
-    outgoingLinks: ["https://crawler-test.com/link1"],
-    imageURLs: ["https://crawler-test.com/image1.jpg"],
-  };
-    expect(extractPageData(
-      `
+test("extract_page_data basic", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody = `
     <html><body>
       <h1>Test Title</h1>
       <p>This is the first paragraph.</p>
       <a href="/link1">Link 1</a>
       <img src="/image1.jpg" alt="Image 1">
     </body></html>
-  `, 'https://crawler-test.com')).toEqual(expected)
-  })
-  test('handles missing elements gracefully', () => {
-    const expected = {
-      url: "https://crawler-test.com",
-      heading: "",
-      firstParagraph: "",
-      outgoingLinks: [],
-      imageURLs: [],
-    };
-    expect(extractPageData(
-      `
+  `;
+
+  const actual = extractPageData(inputBody, inputURL);
+  const expected = {
+    url: "https://crawler-test.com",
+    heading: "Test Title",
+    first_paragraph: "This is the first paragraph.",
+    outgoing_links: ["https://crawler-test.com/link1"],
+    image_urls: ["https://crawler-test.com/image1.jpg"],
+  };
+
+  expect(actual).toEqual(expected);
+});
+
+test("extract_page_data main section priority", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody = `
     <html><body>
-      <h1></h1>
-      <p></p>
+      <nav><p>Navigation paragraph</p></nav>
+      <main>
+        <h1>Main Title</h1>
+        <p>Main paragraph content.</p>
+      </main>
     </body></html>
-  `, 'https://crawler-test.com')).toEqual(expected)
-  })
-})
+  `;
+
+  const actual = extractPageData(inputBody, inputURL);
+  expect(actual.heading).toEqual("Main Title");
+  expect(actual.first_paragraph).toEqual("Main paragraph content.");
+});
+
+test("extract_page_data missing elements", () => {
+  const inputURL = "https://crawler-test.com";
+  const inputBody = `<html><body><div>No h1, p, links, or images</div></body></html>`;
+
+  const actual = extractPageData(inputBody, inputURL);
+  const expected = {
+    url: "https://crawler-test.com",
+    heading: "",
+    first_paragraph: "",
+    outgoing_links: [],
+    image_urls: [],
+  };
+
+  expect(actual).toEqual(expected);
+});

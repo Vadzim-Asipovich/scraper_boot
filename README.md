@@ -4,3 +4,5 @@ run ```nvm use```
 run ```npm test``` 
 # app uses command line argument
 run ```npm run start BASE_URL```
+# optional crawler settings
+run ```npm run start BASE_URL MAX_CONCURRENCY MAX_PAGES```
