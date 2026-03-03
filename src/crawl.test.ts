@@ -4,7 +4,8 @@ import {
   getHeadingFromHTML, 
   normalizeURL, 
   getURLsFromHTML,
-  getImagesFromHTML } from './crawl'
+  getImagesFromHTML,
+  extractPageData } from './crawl'
 
 const expectedOutput = 'www.boot.dev/blog/path'
 
@@ -112,4 +113,41 @@ describe('getImagesFromHTML', () => {
     </body></html>`
     expect(getImagesFromHTML(htmlWithMultipleImages, 'https://www.boot.dev')).toEqual(['https://www.boot.dev/path/image1.png', 'https://www.example.com/path/image2.png'])
   })  
+})
+
+describe('extractPageData', () => {
+  test('relative image URLs are converted to absolute URLs', () => {
+    const expected = {
+    url: "https://crawler-test.com",
+    heading: "Test Title",
+    firstParagraph: "This is the first paragraph.",
+    outgoingLinks: ["https://crawler-test.com/link1"],
+    imageURLs: ["https://crawler-test.com/image1.jpg"],
+  };
+    expect(extractPageData(
+      `
+    <html><body>
+      <h1>Test Title</h1>
+      <p>This is the first paragraph.</p>
+      <a href="/link1">Link 1</a>
+      <img src="/image1.jpg" alt="Image 1">
+    </body></html>
+  `, 'https://crawler-test.com')).toEqual(expected)
+  })
+  test('handles missing elements gracefully', () => {
+    const expected = {
+      url: "https://crawler-test.com",
+      heading: "",
+      firstParagraph: "",
+      outgoingLinks: [],
+      imageURLs: [],
+    };
+    expect(extractPageData(
+      `
+    <html><body>
+      <h1></h1>
+      <p></p>
+    </body></html>
+  `, 'https://crawler-test.com')).toEqual(expected)
+  })
 })

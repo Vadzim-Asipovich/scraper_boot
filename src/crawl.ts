@@ -49,3 +49,20 @@ export function getImagesFromHTML(html: string, baseURL: string): string[]{
         });
         return absoluteImages;
     }
+export type ExtractedPageData = {
+    url: string;
+    heading: string;
+    firstParagraph: string;
+    outgoingLinks: string[];
+    imageURLs: string[];
+}
+export function extractPageData(html: string, pageURL: string): ExtractedPageData{
+    const extractedData: ExtractedPageData = {
+        url: pageURL,
+        heading: getHeadingFromHTML(html),
+        firstParagraph: getFirstParagraphFromHTML(html),
+        outgoingLinks: getURLsFromHTML(html, pageURL),
+        imageURLs: getImagesFromHTML(html, pageURL)
+    }
+    return extractedData;
+}
