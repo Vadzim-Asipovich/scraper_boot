@@ -1,4 +1,5 @@
 import { JSDOM } from "jsdom";
+import { b } from "vitest/dist/chunks/suite.d.BJWk38HB";
 
 
 export function normalizeURL(input: string): string {
@@ -65,4 +66,56 @@ export function extractPageData(html: string, pageURL: string): ExtractedPageDat
         imageURLs: getImagesFromHTML(html, pageURL)
     }
     return extractedData;
+}
+
+export async function getHTML(url: string) {
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            if (response.headers.get("content-type")?.includes("text/html")) {
+                return await response.text();
+            } else {
+                console.error(`Content at ${url} is not HTML: ${response.headers.get("content-type")}`);
+                return null;
+            }
+        } else {
+            console.error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+            return null;
+        }
+    } catch (error) {
+        console.error(`Error fetching ${url}:`, error);
+        return null;
+    }
+}
+
+export async function crawlPage(
+  baseURL: string,
+  currentURL: string = baseURL,
+  pages: Record<string, number> = {},
+) {
+    if (currentURL.includes(baseURL) === false) {
+        return pages;
+    }
+
+    const normalizedURL = normalizeURL(currentURL);
+    if (pages[normalizedURL] > 0) {
+        pages[normalizedURL]++;
+        return pages;
+    }
+
+    pages[normalizedURL] = 1;
+
+    try {
+        const html = await getHTML(currentURL);
+        if (html) {
+            const nextURLs = getURLsFromHTML(html, baseURL);
+            for (const nextURL of nextURLs) {
+                await crawlPage(baseURL, nextURL, pages);
+            }
+        }
+    } catch (err) {
+        console.error(`Error crawling ${currentURL}:`, err);
+    }
+
+    return pages;
 }
